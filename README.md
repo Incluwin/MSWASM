@@ -16,22 +16,24 @@ MapleStory WASM brings the classic MapleStory v83 client to modern web browsers 
 │     Web Server (Python)   │       │            Browser (Client)          │
 │     web/server.py         │──────▶│     MapleStory WASM Client Runtime   │
 │     http://localhost:8000 │ HTTP  │        (JS + WASM in browser)        │
-└───────────────────────────┘       └───────────────┬──────────────┬───────┘
-                                                    │              │
-                                                    │ WebSocket    │ WebSocket
-                                                    │ (Game        │ (Asset
-                                                    │ Packets)     │ Requests)
-                                                    ▼              ▼
-                                          ┌────────────────┐  ┌───────────────────────────┐
-                                          │ WS Proxy       │  │   Assets Server (Python)  │
-                                          │ web/ws_proxy.py│  │   ws://localhost:8765     │
-                                          │ :8080          │  └───────────────────────────┘
-                                          └───────┬────────┘
-                                                  │ TCP
-                                                  ▼
-                                          ┌───────────────────────────┐
-                                          │    Cosmic Server (TCP)    │
-                                          └───────────────────────────┘
+└───────────────────────────┘       └──────┬──────────┬──────���───┬─────────┘
+                                           │          │          │
+                                           │ WS       │ WS       │ WS
+                                           │ (Game)   ��� (Assets) │ (Signaling)
+                                           ▼          ▼          ▼
+                                   ┌────────────┐ ┌──────────┐ ┌──────────────┐
+                                   │ WS Proxy   │ │ Assets   │ │ Social Relay │
+                                   │ ws_proxy.py│ │ Server   │ │ social_      │
+                                   │ :8080      │ │ :8765    │ │ server.py    │
+                                   └─────┬──────┘ └──────────┘ │ :8090        │
+                                         │ TCP                  └──────────────┘
+                                         ▼                             │
+                                   ┌──────────────┐             WebRTC │ P2P
+                                   │ Cosmic Server│    ┌───────────────┘
+                                   │ (TCP)        │    ▼
+                                   └──────────────┘  Other Players
+                                                     (direct browser-
+                                                      to-browser)
 ```
 
 ### How It Works
@@ -39,7 +41,8 @@ MapleStory WASM brings the classic MapleStory v83 client to modern web browsers 
 1. **WASM Client** - The original C++ MapleStory client is compiled to WebAssembly using Emscripten, and `web/server.py` serves the generated JS/WASM bundle to the browser.
 2. **WebSocket Proxy** - Browsers cannot make raw TCP connections, so a Python proxy bridges WebSocket connections to Cosmic server over TCP.
 3. **LazyFS** - A dynamic file system technology that streams game assets (`.nx` files) on-demand via WebSocket and caches them locally in your browser. Assets are only fetched from the network once, providing native loading times on subsequent loads.
-4. **Containerized Tooling** - Docker can be used both for serving the project and as a fallback way to build the WASM client.
+4. **P2P Social System** - A browser-based social overlay providing cross-server buddy list, guild, and chat. All social data lives in each player's browser (IndexedDB). A lightweight signaling relay helps browsers find each other for WebRTC connections, but stores nothing. See [docs/p2p-social-system.md](docs/p2p-social-system.md) for full documentation.
+5. **Containerized Tooling** - Docker can be used both for serving the project and as a fallback way to build the WASM client.
 
 ---
 
@@ -49,11 +52,17 @@ MapleStory WASM brings the classic MapleStory v83 client to modern web browsers 
 > You **must** provide your own game assets to run this project. We cannot distribute them due to copyright.
 
 ### 1. Client Assets (`.nx` files)
-Place the `.nx` files into the `assets/` directory at the project root.
-- These are the same `.nx` files required by the upstream v83 C++ client codebase.
-- If you only have `.wz` files, use the [WZ to NX converter](./scripts/wz-converter/README.md) to generate `.nx` files first.
-- **Location:** `maplestory-wasm/assets/*.nx`
-- Treat `assets/` as read-only. Do not modify files in this directory.
+
+You'll need a copy of MapleStory **v83** and a copy of MapleStory **v153 or newer**. Any standard installer for those versions will do.
+
+To put together the asset set:
+
+1. Take every `.wz` file from the **v83** install **except** `UI.wz`.
+2. Take **only** `UI.wz` from the **v153+** install.
+3. Run all of those `.wz` files through the [WZ to NX converter](./scripts/wz-converter/README.md) to produce `.nx` files.
+4. Drop the resulting `.nx` files into `maplestory-wasm/assets/`.
+
+Treat `assets/` as read-only once the files are in place — don't modify anything in it.
 
 ---
 

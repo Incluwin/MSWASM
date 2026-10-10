@@ -5,5 +5,7 @@
   "MapleStoryServerIp": null,
   "MapleStoryServerPort": null,
   "ProxyIP": null,
-  "ProxyPort": null
+  "ProxyPort": null,
+  "SocialServerIP": null,
+  "SocialServerPort": null
 }

@@ -3,3 +3,5 @@
 /assets/
 /serverAssets/
 __pycache__
+/.local/
+social.db
